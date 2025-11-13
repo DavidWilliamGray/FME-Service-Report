@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Station Report Generator</title>
+
+  <!-- Mobile-friendly viewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap 5 CSS (no integrity so the browser won't block it locally) -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  >
+
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    body {
+      background: #f3f4f6;
+    }
+
+    .app-header {
+      background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+      color: #fff;
+      padding: 1.25rem 1rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .app-title {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .app-subtitle {
+      margin: 0;
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+
+    .app-card {
+      border-radius: 1rem;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+      border: 0;
+    }
+
+    .app-card .card-body {
+      padding: 1.5rem;
+    }
+
+    .form-label {
+      font-weight: 500;
+    }
+
+    .section-heading {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6c757d;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Mobile tweaks */
+    @media (max-width: 576px) {
+      .app-header {
+        border-radius: 0 0 1rem 1rem;
+      }
+      .app-card {
+        border-radius: 1rem 1rem 0 0;
+        margin-top: -1rem;
+      }
+      .generate-btn {
+        position: sticky;
+        bottom: 0;
+        z-index: 10;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="container">
+      <h1 class="app-title">Station Report Generator</h1>
+      <p class="app-subtitle">Fill in the details below and generate a PDF site report.</p>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <main class="container my-4">
+    <div class="card app-card">
+      <div class="card-body">
+        <form id="surveyForm" novalidate>
+          <div class="mb-3">
+            <div class="section-heading">Site details</div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <label for="stationType" class="form-label">Type of station *</label>
+              <select id="stationType" name="stationType" class="form-select" required>
+                <option value="">Select station type</option>
+                <option value="Pumping station">Pumping station</option>
+                <option value="Treatment plant">Treatment plant</option>
+                <option value="Monitoring station">Monitoring station</option>
+                <option value="Reservoir">Reservoir</option>
+                <!-- Add more options if needed -->
+              </select>
+              <div class="invalid-feedback">
+                Please choose a station type.
+              </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label for="location" class="form-label">Location / Site name *</label>
+              <input type="text" id="location" name="location" class="form-control" placeholder="e.g. Riverbank PS-01" required>
+              <div class="invalid-feedback">
+                Please enter the site name or location.
+              </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label for="inspectorName" class="form-label">Engineer / Inspector name *</label>
+              <input type="text" id="inspectorName" name="inspectorName" class="form-control" placeholder="Your name" required>
+              <div class="invalid-feedback">
+                Please enter your name.
+              </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label for="inspectionDate" class="form-label">Inspection date *</label>
+              <input type="date" id="inspectionDate" name="inspectionDate" class="form-control" required>
+              <div class="invalid-feedback">
+                Please select an inspection date.
+              </div>
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <div class="mb-3">
+            <div class="section-heading">Observations</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="notes" class="form-label">General notes / observations</label>
+            <textarea
+              id="notes"
+              name="notes"
+              class="form-control"
+              rows="4"
+              placeholder="Key observations, issues, recommendations..."
+            ></textarea>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mt-4">
+            <small class="text-muted">Fields marked * are required.</small>
+          </div>
+
+          <div class="d-grid mt-3 generate-btn">
+            <button type="button" id="generateBtn" class="btn btn-primary btn-lg">
+              Generate PDF Report
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bootstrap JS (optional, for nicer behaviour of components) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // Set default inspection date to today's date (device date)
+    const dateInput = document.getElementById("inspectionDate");
+    if (dateInput && !dateInput.value) {
+      const today = new Date().toISOString().slice(0, 10);
+      dateInput.value = today;
+    }
+
+    // Station-type specific text for the PDF
+    function getStationTypeSection(stationType) {
+      switch (stationType) {
+        case "Pumping station":
+          return [
+            "Station-specific checklist:",
+            "- Check pump operation and noise levels.",
+            "- Verify inlet/outlet valves and pressure readings.",
+            "- Inspect for leaks and corrosion around pipework."
+          ];
+        case "Treatment plant":
+          return [
+            "Station-specific checklist:",
+            "- Review process stages (screening, aeration, clarification).",
+            "- Check chemical dosing systems and storage.",
+            "- Verify effluent quality measurements."
+          ];
+        case "Monitoring station":
+          return [
+            "Station-specific checklist:",
+            "- Confirm calibration dates of sensors.",
+            "- Verify data logging and communication status.",
+            "- Inspect security and access control."
+          ];
+        case "Reservoir":
+          return [
+            "Station-specific checklist:",
+            "- Inspect embankments and spillways.",
+            "- Check water level measurements.",
+            "- Review signage and safety equipment."
+          ];
+        default:
+          return [
+            "Station-specific checklist:",
+            "- (No predefined checklist for this station type.)"
+          ];
+      }
+    }
+
+    // Simple Bootstrap-style validation + PDF generation
+    document.getElementById("generateBtn").addEventListener("click", function () {
+      const form = document.getElementById("surveyForm");
+
+      // Bootstrap validation styling
+      if (!form.checkValidity()) {
+        form.classList.add("was-validated");
+        return;
+      }
+
+      // Check jsPDF actually loaded
+      if (!window.jspdf || !window.jspdf.jsPDF) {
+        alert("PDF library failed to load. Please check your internet connection and reload the page.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+
+      const data = {
+        stationType: form.stationType.value,
+        location: form.location.value,
+        inspectorName: form.inspectorName.value,
+        inspectionDate: form.inspectionDate.value,
+        notes: form.notes.value || "No additional notes recorded."
+      };
+
+      const doc = new jsPDF();
+      const leftMargin = 20;
+      let y = 20;
+
+      // Title
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("Site Assessment Report", leftMargin, y);
+      y += 10;
+
+      // Basic info
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.text(`Station type: ${data.stationType}`, leftMargin, y); y += 7;
+      doc.text(`Location / Site: ${data.location}`, leftMargin, y); y += 7;
+      doc.text(`Engineer / Inspector: ${data.inspectorName}`, leftMargin, y); y += 7;
+      doc.text(`Inspection date: ${data.inspectionDate}`, leftMargin, y); y += 12;
+
+      // Notes
+      doc.setFont("helvetica", "bold");
+      doc.text("General notes / observations:", leftMargin, y);
+      y += 7;
+
+      doc.setFont("helvetica", "normal");
+      const splitNotes = doc.splitTextToSize(data.notes, 170);
+      doc.text(splitNotes, leftMargin, y);
+      y += splitNotes.length * 6 + 10;
+
+      // Station-specific section
+      const stationLines = getStationTypeSection(data.stationType);
+
+      if (y > 260) {
+        doc.addPage();
+        y = 20;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.text(stationLines[0], leftMargin, y);
+      y += 7;
+
+      doc.setFont("helvetica", "normal");
+      for (let i = 1; i < stationLines.length; i++) {
+        if (y > 280) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(stationLines[i], leftMargin, y);
+        y += 6;
+      }
+
+      // Footer
+      if (y > 260) {
+        doc.addPage();
+        y = 280;
+      } else {
+        y = 280;
+      }
+      doc.setFontSize(10);
+      doc.text("Generated by Station Report App", leftMargin, y);
+
+      // File name and download
+      const safeType = data.location.replace(/\s+/g, "_");
+      const filename = `report_${safeType}_${data.inspectionDate}.pdf`;
+      doc.save(filename);
+    });
+  </script>
+</body>
+</html>
